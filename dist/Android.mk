@@ -27,7 +27,14 @@ common_sqlite_flags := \
 	-DSQLITE_OMIT_BUILTIN_TEST \
 	-DSQLITE_OMIT_COMPILEOPTION_DIAGS \
 	-DSQLITE_OMIT_LOAD_EXTENSION \
-	-DSQLITE_DEFAULT_FILE_PERMISSIONS=0600
+	-DSQLITE_DEFAULT_FILE_PERMISSIONS=0600 \
+	-Dfdatasync=fdatasync
+
+ifeq ($(call is-vendor-board-platform,QCOM),true)
+ifeq ($(TARGET_HAVE_QC_PERF),true)
+android_common_sqlite_flags += -DQC_PERF
+endif
+endif
 
 device_sqlite_flags := $(common_sqlite_flags) \
     -DSQLITE_ENABLE_ICU \
@@ -45,13 +52,16 @@ include $(CLEAR_VARS)
 
 LOCAL_SRC_FILES := $(common_src_files)
 
-LOCAL_CFLAGS += $(device_sqlite_flags)
+LOCAL_CFLAGS += $(android_common_sqlite_flags) $(device_sqlite_flags)
 
 LOCAL_SHARED_LIBRARIES := libdl
 
 LOCAL_MODULE:= libsqlite
 
-LOCAL_C_INCLUDES += $(call include-path-for, system-core)/cutils
+LOCAL_C_INCLUDES += \
+    $(call include-path-for, system-core)/cutils \
+    external/icu/icu4c/source/i18n \
+    external/icu/icu4c/source/common
 
 LOCAL_SHARED_LIBRARIES += liblog \
             libicuuc \
@@ -61,6 +71,11 @@ LOCAL_SHARED_LIBRARIES += liblog \
 
 # include android specific methods
 LOCAL_WHOLE_STATIC_LIBRARIES := libsqlite3_android
+
+ifeq ($(TARGET_HAVE_QC_PERF),true)
+LOCAL_WHOLE_STATIC_LIBRARIES += libqc-sqlite
+LOCAL_SHARED_LIBRARIES += libcutils
+endif
 
 include $(BUILD_SHARED_LIBRARY)
 
@@ -90,17 +105,16 @@ LOCAL_SRC_FILES := shell.c
 
 LOCAL_C_INCLUDES := \
     $(LOCAL_PATH)/../android \
-    $(call include-path-for, system-core)/cutils
+    $(call include-path-for, system-core)/cutils \
+    external/icu4c/i18n \
+    external/icu4c/common
 
 LOCAL_SHARED_LIBRARIES := libsqlite \
             libicuuc \
             libicui18n \
-            liblog \
             libutils
 
-LOCAL_STATIC_LIBRARIES := libicuandroid_utils
-
-LOCAL_CFLAGS += $(device_sqlite_flags)
+LOCAL_CFLAGS += $(android_common_sqlite_flags) $(device_sqlite_flags)
 
 LOCAL_MODULE_PATH := $(TARGET_OUT_OPTIONAL_EXECUTABLES)
 
@@ -122,6 +136,7 @@ endif # !SDK_ONLY
 include $(CLEAR_VARS)
 
 LOCAL_SRC_FILES := $(common_src_files) shell.c
+
 LOCAL_CFLAGS += $(host_sqlite_flags) \
     -DNO_ANDROID_FUNCS=1
 
